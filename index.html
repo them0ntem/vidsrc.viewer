@@ -81,6 +81,8 @@
         import { createClient } from "https://cdn.skypack.dev/@supabase/supabase-js";
         const supabaseUrl = 'https://nlpqnilzcamieqcyvrtm.supabase.co'; // Replace with your Supabase URL
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5scHFuaWx6Y2FtaWVxY3l2cnRtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjU4NzE3NjksImV4cCI6MjA0MTQ0Nzc2OX0.yAJKEBru2J-y-hx2pv2SnM7a_CBa8B9ll8HSQqxYVHM'; // Replace with your Supabase public API key
+        const omdbApiKey = 'd786eb7';
+        
         const supabase = createClient(supabaseUrl, supabaseKey);
 
         // Function to generate and load the iframe
@@ -171,6 +173,25 @@
             }
         });
 
+        // Function to fetch poster from OMDb API
+        async function fetchTitle(imdbId) {
+            console.log(imdbId);
+            try {
+                const response = await fetch(`https://www.omdbapi.com/?i=${imdbId}&apikey=${omdbApiKey}`);
+                const data = await response.json();
+
+                if (data.Response === 'True') {
+                    return data.Title;
+                } else {
+                    console.error('Poster not found:', data.Error);
+                }
+            } catch (error) {
+                console.error('Error fetching poster:', error);
+            }
+
+            return imdbId;
+        }
+
          // Function to fetch and display IMDb IDs from Supabase
          async function fetchImdbList() {
             try {
@@ -186,12 +207,16 @@
                 data.forEach(item => {
                     const listItem = document.createElement('li');
                     listItem.className = 'list-group-item text-dark';
-                    listItem.textContent = item.imdb_id;
-                    listItem.addEventListener('click', () => {
-                        document.getElementById('imdbId').value = item.imdb_id;
-                        generateIframe(); // Optionally regenerate the iframe
+
+                    var title = fetchTitle(item.imdb_id).then((title) => {
+                        listItem.textContent = title
+                        listItem.addEventListener('click', () => {
+                            document.getElementById('imdbId').value = item.imdb_id;
+                            generateIframe(); // Optionally regenerate the iframe
+                        });
+                        imdbList.appendChild(listItem);
                     });
-                    imdbList.appendChild(listItem);
+                    
                 });
             } catch (error) {
                 console.error('Error fetching IMDb list:', error);
