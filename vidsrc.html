@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VidSrc Viewer</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        /* Custom styles for the left pane */
+        #leftPane {
+            border-right: 1px solid #ccc;
+            height: 100vh;
+            overflow-y: auto;
+        }
+        #listItems {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body class="bg-dark text-light">
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Left Pane -->
+            <div id="leftPane" class="col-md-3">
+                <h2>My List</h2>
+                <div class="input-group mb-3">
+                    <input type="text" id="imdbInput" class="form-control" placeholder="Add IMDb ID (e.g., tt0417299)">
+                    <div class="input-group-append">
+                        <button class="btn btn-primary" id="addButton">Add</button>
+                    </div>
+                </div>
+                <div id="listItems">
+                    <!-- List items will be added here -->
+                </div>
+                <ul id="imdbList" class="list-group">
+                    <!-- IMDb IDs will be displayed here -->
+                </ul>
+            </div>
+
+            <div class="col-md-9">
+                <h2 class="my-4 text-center">Player Tester</h2>
+                <div class="row justify-content-center mb-4">
+                    <div class="col-md-8">
+                        <div class="input-group mb-3">
+                            <input type="text" id="vidSrcUrl" class="form-control" placeholder="VidSrc Url (e.g., vidsrc.me)" value="vidsrc.me">
+                        </div>
+                        <div class="input-group mb-3">
+                            <input type="text" id="imdbId" class="form-control" placeholder="IMDb ID (e.g., tt0417299)" value="tt0417299">
+                        </div>
+                        <div class="row mb-3">
+                            <div class="input-group col-md-6">
+                                <input type="number" id="season" class="form-control" placeholder="Season" min="1" value="2">
+                            </div>
+                            <div class="input-group col-md-6">
+                                <input type="number" id="episode" class="form-control" placeholder="Episode" min="1" value="2">
+                            </div>
+                    </div>
+                    </div>
+                </div>
+
+                <div class="row justify-content-center col-md-12">
+                    <div class="col-md-9">
+                        <div id="iframeContainer" class="embed-responsive embed-responsive-16by9">
+                            <!-- Video iframe will load here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+    </div>
+
+    <!-- Bootstrap JS and dependencies (Popper.js and jQuery) -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.2/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2.45.3/dist/umd/supabase.js"></script>
+
+    <script  type="module">
+        // Initialize Supabase client
+        import { createClient } from "https://cdn.skypack.dev/@supabase/supabase-js";
+        const supabaseUrl = 'https://nlpqnilzcamieqcyvrtm.supabase.co'; // Replace with your Supabase URL
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5scHFuaWx6Y2FtaWVxY3l2cnRtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjU4NzE3NjksImV4cCI6MjA0MTQ0Nzc2OX0.yAJKEBru2J-y-hx2pv2SnM7a_CBa8B9ll8HSQqxYVHM'; // Replace with your Supabase public API key
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        // Function to generate and load the iframe
+        async function generateIframe(event) {
+            const vidSrcUrl = document.getElementById('vidSrcUrl').value;
+            const imdbId = document.getElementById('imdbId').value;
+            const season = document.getElementById('season').value;
+            const episode = document.getElementById('episode').value;
+
+            // Save and update data in Supabase
+            if (event !== undefined && event.isTrusted) {
+                await updateData(imdbId, season, episode);
+            }
+
+            // Build the iframe URL
+            const iframeUrl = `https://${vidSrcUrl}/embed/tv?imdb=${imdbId}&season=${season}&episode=${episode}`;
+
+            // Embed the iframe
+            const iframe = `<iframe src="${iframeUrl}" class="embed-responsive-item" frameborder="0" allowfullscreen></iframe>`;
+            document.getElementById('iframeContainer').innerHTML = iframe;
+        }
+
+        // Update data in Supabase
+        async function updateData(imdbId, season, episode) {
+            try {
+                // Upsert data in Supabase
+                const { data, error } = await supabase
+                    .from('episodes')
+                    .upsert([
+                        { imdb: imdbId, season: parseInt(season, 10), episode: parseInt(episode, 10) }
+                    ], { onConflict: ['imdb'] });
+
+                if (error) throw error;
+
+                console.log('Data updated:', data);
+            } catch (error) {
+                console.error('Error updating data:', error);
+            }
+        }
+
+        // Fetch data from Supabase
+        async function fetchData(imdbId) {
+            try {
+                // Fetch data from Supabase
+                const { data, error } = await supabase
+                    .from('episodes')
+                    .select('season, episode')
+                    .eq('imdb', imdbId)
+                    .single();
+
+                if (error) throw error;
+
+                if (data) {
+                    document.getElementById('season').value = data.season || 1;
+                    document.getElementById('episode').value = data.episode || 1;
+                } else {
+                    // Set default values if no data is found
+                    document.getElementById('season').value = 1;
+                    document.getElementById('episode').value = 1;
+                }
+            } catch (error) {
+                console.error('Error fetching data:', error);
+            }
+        }
+
+        // Function to add IMDb ID to Supabase
+        async function addImdbId(imdbId) {
+            try {
+                const { data, error } = await supabase
+                    .from('my_list')
+                    .insert([{ imdb_id: imdbId }]);
+
+                if (error) throw error;
+
+                console.log('IMDb ID added:', data);
+                fetchImdbList(); // Refresh list after adding
+            } catch (error) {
+                console.error('Error adding IMDb ID:', error);
+            }
+        }
+
+        // Event listener for adding IMDb ID
+        document.getElementById('addButton').addEventListener('click', () => {
+            const imdbId = document.getElementById('imdbInput').value;
+            if (imdbId) {
+                addImdbId(imdbId);
+                document.getElementById('imdbInput').value = ''; // Clear input field
+            }
+        });
+
+         // Function to fetch and display IMDb IDs from Supabase
+         async function fetchImdbList() {
+            try {
+                const { data, error } = await supabase
+                    .from('my_list')
+                    .select('imdb_id');
+
+                if (error) throw error;
+
+                const imdbList = document.getElementById('imdbList');
+                imdbList.innerHTML = ''; // Clear current list
+
+                data.forEach(item => {
+                    const listItem = document.createElement('li');
+                    listItem.className = 'list-group-item text-dark';
+                    listItem.textContent = item.imdb_id;
+                    listItem.addEventListener('click', () => {
+                        document.getElementById('imdbId').value = item.imdb_id;
+                        generateIframe(); // Optionally regenerate the iframe
+                    });
+                    imdbList.appendChild(listItem);
+                });
+            } catch (error) {
+                console.error('Error fetching IMDb list:', error);
+            }
+        }
+
+        // Load previous values from local storage
+        window.onload = function() {
+            fetchImdbList();
+            const lastImdb = localStorage.getItem('lastImdb');
+
+            if (lastImdb) document.getElementById('imdbId').value = lastImdb;
+            fetchData(lastImdb);
+            setTimeout(generateIframe, 1000);
+        }
+
+        // Automatically generate the iframe and fetch data when IMDb ID changes
+        document.getElementById('imdbId').addEventListener('input', function() {
+            const imdbId = document.getElementById('imdbId').value;
+            localStorage.setItem('lastImdb', imdbId);
+            fetchData(imdbId); // Fetch and update fields based on IMDb ID
+            generateIframe(); // Update iframe based on new values
+        });
+
+        document.getElementById('vidSrcUrl').addEventListener('input', generateIframe);
+        document.getElementById('season').addEventListener('input', generateIframe);
+        document.getElementById('episode').addEventListener('input', generateIframe);
+    </script>
+</body>
+</html>
